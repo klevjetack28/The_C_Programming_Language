@@ -33,17 +33,63 @@ int main()
     return 0;
 }
 
-struct tnode* talloc(void);
-char* strdup(char *);
+int getword(char* word, int lim)
+{
+    int c, getch(void);
+    void ungetch(int);
+    char* w = word;
 
-struct tnode* addree(struct tnode* node, char* w);
+    while (isspace(c = getch()));
+
+    if (c != EOF)
+    {
+        *w++ = c;
+    }
+    if (!isalpha(c) && c != '"' && c != '/' && c != '#')
+    {
+        *w = '\0';
+        return c;
+    }
+    for ( ; --lim > 0; w++)
+    {
+        if (!isalnum(*w = getch()) && *w != '_' && *w != '"' && *w != '/' && *w != '*')
+        {
+            ungetch(*w);
+            break;
+        }
+    }
+    *w = '\0';
+    return word[0];
+}
+
+int getch(void)
+{
+    return (bufp > 0) ? buf[--bufp] : getchar();
+}
+
+void ungetch(int c)
+{
+    if (bufp >= BUFSIZE)
+    {
+        printf("ungetch: too many characters\n");
+    }
+    else 
+    {
+        buf[bufp++] = c;
+    }
+}
+
+struct tnode* talloc(void);
+char* my_strdup(char *);
+
+struct tnode* addtree(struct tnode* node, char* w);
 {
     int cond;
 
     if (node == NULL)
     {
         node = talloc();
-        node->word = strdup(key);
+        node->word = my_strdup(key);
         node->count = 1;
         node->left = node->right = NULL;
     }
@@ -64,10 +110,10 @@ struct tnode* addree(struct tnode* node, char* w);
 
 struct tnode* talloc(void)
 {
-    return (struct tnode*)malloc(sizeof(struct tnode))
+    return (struct tnode*)malloc(sizeof(struct tnode));
 }
 
-char* strdup(char* s)
+char* my_strdup(char* s)
 {
     char* p;
 
@@ -83,8 +129,8 @@ void treeprint(struct tnode* node)
 {
     if (node != NULL)
     {
-        treeprint(p->left);
-        printf("%4d %s\n", p->count, p->word);
-        treeprint(p->right);
+        treeprint(node->left);
+        printf("%4d %s\n", node->count, node->word);
+        treeprint(node->right);
     }
 }
