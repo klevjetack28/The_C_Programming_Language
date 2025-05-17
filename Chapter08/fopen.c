@@ -1,5 +1,7 @@
 #include <stdlib.h>
 
+#undef NULL
+
 #define NULL        0
 #define EOF         (-1)
 #define BUFSIZE     1024
@@ -7,11 +9,18 @@
 
 typedef struct _iobuf
 {
-     int cnt;               /* characters left */
-     char *ptr;             /* next character in position */
-     char *base;            /* location of buffer */
-     struct _flag* flag;     /* mode of file access */
-     int fd;                /* file descriptor */
+    int cnt;                        /* characters left */
+    char *ptr;                      /* next character in position */
+    char *base;                     /* location of buffer */
+    struct
+    {
+        unsigned int _READ  : 1;     /* file open for reading */
+        unsigned int _WRITE : 1;     /* file open for writing */
+        unsigned int _UNBUF : 1;     /* file is unbuffered */
+        unsigned int _EOF   : 1;     /* EOF has occurred on this file */
+        unsigned int _ERR   : 1;     /* error occurred on this file */  
+    } flags;                        /* mode of file access */
+    int fd;                         /* file descriptor */
 } FILE;
 extern FILE _iob[OPEN_MAX];
 
@@ -19,29 +28,20 @@ extern FILE _iob[OPEN_MAX];
 #define stdout  (&_iob[1])
 #define stderr  (&_iob[2])
 
-struct _flag
-{
-    unsigned int READ  : 1;   /* file open for reading */
-    unsigned int WRITE : 1;   /* file open for writing */
-    unsigned int UNBUF : 1;   /* file is unbuffered */
-    unsigned int EOF   : 1;  /* EOF has occurred on this file */
-    unsigned int ERR   : 1;   /* error occurred on this file */
-} _flags;
-
 int _fillbuf(FILE *);
 int _flushbuf(int, FILE *);
 
-#define feof(p)     (*(p->flag).EOF)
-#define ferror(p)   (*(p->flag).ERR) != 0)
+#define feof(p)     (*(p->flags)._EOF)
+#define ferror(p)   (*(p->flags)._ERR) != 0)
 #define fileno(p)   ((p)->fd)
 
 #define getc(p)     (--(p)->cnt >= 0 \
                 ?   (unsigned char) *(p)->ptr++ : _fillbuf(p))
 #define putc(x, p)  (--(p)->cnt >= 0 \
-                ?  *(p)->ptr++ = (x) : _flushbuf((x),p))
+                ?  *(p)->ptr++ = (x) : _flushbuf((x), p))
 
 #define getchar()   getc(stdin)
-#define putchar(x)  putc(x), stdout)
+#define putchar(x)  putc((x), stdout)
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -58,7 +58,7 @@ FILE *fopen(char *name, char *mode)
     }
     for (fp = _iob; fp < _iob + OPEN_MAX; fp++)
     {
-        if (((fp->flag.READ == 0) | (fp->flag.EOF)) == 0)
+        if ((fp->flags._READ == 0) | (fp->flags._EOF == 0))
         {
             break;
         }
@@ -91,7 +91,8 @@ FILE *fopen(char *name, char *mode)
     fp->fd = fd;
     fp->cnt = 0;
     fp->base = NULL;
-    fp->flag = (*mode == 'r') ? _READ : _WRITE;
+    fp->flags._READ = (*mode == 'r') ? 1 : 0;
+    fp->flags._WRITE = (*mode == 'w' || *mode == 'a') ? 1 : 0;
     return fp;
 }
 
@@ -99,11 +100,11 @@ int _fillbuf(FILE *fp)
 {
     int bufsize;
 
-    if ((fp->flag & (_READ | _EOF | _ERR)) != _READ)
+    if (fp->flags._READ != 1 || fp->flags._EOF == 1 || fp->flags._ERR == 1)
     {
         return EOF;
     }
-    bufsize = (fp->flag.UNBUF == 1) ? 1 : BUFSIZE;
+    bufsize = (fp->flags._UNBUF == 1) ? 1 : BUFSIZE;
     if (fp->base == NULL)
     {
         if ((fp->base = malloc(bufsize)) == NULL)
@@ -117,11 +118,11 @@ int _fillbuf(FILE *fp)
     {
         if (fp->cnt == -1)
         {
-            fp->flag.EOF = 1;
+            fp->flags._EOF = 1;
         }
         else
         {
-            fp->flag.ERR = 1;
+            fp->flags._ERR = 1;
         }
         fp->cnt = 0;
         return EOF;
@@ -131,19 +132,26 @@ int _fillbuf(FILE *fp)
 /*
 int _flushbuf(int fd, FILE *fp)
 {
-    if ((fp->flag & (_WRITE | _EOF | _ERR)) != _WRITE)
+
+    if ((fp->flags._WRITE != 0 || fp->flags._EOF == 1 || fp->flags._EOF == 1)
     {
         return EOF;
     }
-    putc
-    
-    free(fp->base);
+    int n;
+    int bufsize = (fp->flags._UNBUF == 1) ? 1 : BUFSIZE;
+    char buf[bufsize];
+    if ((n = read(fd, buf, bufsize)) == 0)
+    {
+        return EOF;
+    }
+    write(fp->fd, buf, n);
+    free(buf);
 }
 */
 FILE _iob[OPEN_MAX] = {
-    { 0, (char *) 0, (char *) 0, _READ, 0 },
-    { 0, (char *) 0, (char *) 0, _WRITE, 1 },
-    { 0, (char *) 0, (char *) 0, _WRITE, 2 }
+    { 0, (char *) 0, (char *) 0, { ._READ = 1 }, 0 },
+    { 0, (char *) 0, (char *) 0, { ._WRITE = 1 }, 1 },
+    { 0, (char *) 0, (char *) 0, { ._WRITE = 1 }, 2 }
 };
 
 /*
@@ -162,6 +170,13 @@ with the buffering done for the other functions of the library
 */
 
 int main()
-{
+{/*
+    int c;
+    FILE *cprog = fopen("copy.c", "r");
+    while ((c = getc(cprog)) != EOF)
+    {
+        putchar(c);
+    }*/
+    //fclose(cprog);
     return 0;
 }
