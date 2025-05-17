@@ -1,3 +1,5 @@
+#include <stdlib.h>
+
 #define NULL        0
 #define EOF         (-1)
 #define BUFSIZE     1024
@@ -5,11 +7,11 @@
 
 typedef struct _iobuf
 {
-     int cnt;       /* characters left */
-     char *ptr;     /* next character in position */
-     char *base;    /* location of buffer */
-     int flag;      /* mode of file access */
-     int fd;        /* file descriptor */
+     int cnt;               /* characters left */
+     char *ptr;             /* next character in position */
+     char *base;            /* location of buffer */
+     struct _flag* flag;     /* mode of file access */
+     int fd;                /* file descriptor */
 } FILE;
 extern FILE _iob[OPEN_MAX];
 
@@ -17,20 +19,20 @@ extern FILE _iob[OPEN_MAX];
 #define stdout  (&_iob[1])
 #define stderr  (&_iob[2])
 
-enum _flags 
+struct _flag
 {
-    _READ   = 01,   /* file open for reading */
-    _WRITE  = 02,   /* file open for writing */
-    _UNBUF  = 04,   /* file is unbuffered */
-    _EOF    = 010,  /* EOF has occurred on this file */
-    _ERR    = 020   /* error occurred on this file */
-};
+    unsigned int READ  : 1;   /* file open for reading */
+    unsigned int WRITE : 1;   /* file open for writing */
+    unsigned int UNBUF : 1;   /* file is unbuffered */
+    unsigned int EOF   : 1;  /* EOF has occurred on this file */
+    unsigned int ERR   : 1;   /* error occurred on this file */
+} _flags;
 
 int _fillbuf(FILE *);
 int _flushbuf(int, FILE *);
 
-#define feof(p)     ((p)->flag & _EOF) != 0)
-#define ferror(p)   ((p)->flag & _ERR) != 0)
+#define feof(p)     (*(p->flag).EOF)
+#define ferror(p)   (*(p->flag).ERR) != 0)
 #define fileno(p)   ((p)->fd)
 
 #define getc(p)     (--(p)->cnt >= 0 \
@@ -56,7 +58,7 @@ FILE *fopen(char *name, char *mode)
     }
     for (fp = _iob; fp < _iob + OPEN_MAX; fp++)
     {
-        if ((fp->flag & (_READ | _WRITE)) == 0)
+        if (((fp->flag.READ == 0) | (fp->flag.EOF)) == 0)
         {
             break;
         }
@@ -101,7 +103,7 @@ int _fillbuf(FILE *fp)
     {
         return EOF;
     }
-    bufsize = (fp->flag & _UNBUF) ? 1 : BUFSIZE;
+    bufsize = (fp->flag.UNBUF == 1) ? 1 : BUFSIZE;
     if (fp->base == NULL)
     {
         if ((fp->base = malloc(bufsize)) == NULL)
@@ -115,20 +117,51 @@ int _fillbuf(FILE *fp)
     {
         if (fp->cnt == -1)
         {
-            fp->flag |= _EOF;
+            fp->flag.EOF = 1;
         }
         else
         {
-            fp->flag |= _ERR;
+            fp->flag.ERR = 1;
         }
         fp->cnt = 0;
         return EOF;
     }
     return (unsigned char) *fp->ptr++;
 }
-
+/*
+int _flushbuf(int fd, FILE *fp)
+{
+    if ((fp->flag & (_WRITE | _EOF | _ERR)) != _WRITE)
+    {
+        return EOF;
+    }
+    putc
+    
+    free(fp->base);
+}
+*/
 FILE _iob[OPEN_MAX] = {
     { 0, (char *) 0, (char *) 0, _READ, 0 },
     { 0, (char *) 0, (char *) 0, _WRITE, 1 },
     { 0, (char *) 0, (char *) 0, _WRITE, 2 }
 };
+
+/*
+Exercise 8-2. Rewrite fopen and _fillbuf with fields instead of explicit bit operations.
+    Compare code size and execution speed.
+
+Exercise 8-3. Design and write _flushbuf, fflush, and fclose.
+    int _flushbuf(int, FILE *);
+
+Exercise 8-4. The standard library function
+    int fseek(FILE *fp, long offset, int origin)
+
+is identical to lseek except that fp is a file pointer instead of a file descriptor and return value
+is an int status, not a position. Write fseek. Make sure that your fseek coordinates properly
+with the buffering done for the other functions of the library
+*/
+
+int main()
+{
+    return 0;
+}
